@@ -1,0 +1,22 @@
+# LOCAL SMOKE-TEST PROFILE ONLY — activated with -Dspring-boot.run.profiles=local.
+# Overrides every env-var placeholder from application.yml with in-memory/dummy
+# values so the app boots with no real secrets. Not for production use.
+spring:
+  datasource:
+    url: jdbc:h2:mem:cardlens;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create        # H2 builds schema from JPA entities (no schema.sql)
+    database-platform: org.hibernate.dialect.H2Dialect
+
+cardlens:
+  api-key: local-dev-key      # dummy static key; use in X-Api-Key for local calls
+  claude:
+    api-key: dummy-not-used   # extraction is not exercised in the smoke test
+  gmail:
+    client-id: dummy
+    client-secret: dummy
+    refresh-token: dummy

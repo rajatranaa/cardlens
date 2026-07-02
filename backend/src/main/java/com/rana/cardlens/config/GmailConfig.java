@@ -12,12 +12,16 @@ import com.google.api.services.gmail.Gmail;
 import com.google.api.services.gmail.GmailScopes;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 /**
  * Builds an authorized Gmail client using a refresh token supplied via env var.
  * Scope is restricted to gmail.readonly. The client auto-refreshes access tokens.
+ * Disabled under the "local" profile (see LocalGmailConfig) so the app can boot
+ * without real Gmail credentials for wiring smoke tests.
  */
 @Configuration
+@Profile("!local")
 public class GmailConfig {
 
     private static final String APP_NAME = "CardLens";
