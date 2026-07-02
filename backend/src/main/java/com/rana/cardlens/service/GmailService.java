@@ -35,8 +35,14 @@ public class GmailService {
         this.user = props.getGmail().getUser();
     }
 
-    /** Returns the first matching PDF attachment for the card+period, or null. */
-    public byte[] fetchStatementPdf(Card card, int month, int year) throws Exception {
+    /**
+     * Returns every candidate PDF attachment for the card's sender + period,
+     * newest first. More than one is expected when several cards share a
+     * statement sender (e.g. two cards from the same issuer): the caller
+     * disambiguates by decrypting with the card's password and matching last4.
+     * Returns an empty list when nothing matches.
+     */
+    public List<byte[]> fetchStatementPdfs(Card card, int month, int year) throws Exception {
         YearMonth ym = YearMonth.of(year, month);
         LocalDate after = ym.atDay(1);
         LocalDate before = ym.plusMonths(1).atDay(1);
@@ -49,21 +55,26 @@ public class GmailService {
         if (card.getSubjectPattern() != null && !card.getSubjectPattern().isBlank()) {
             q.append(" subject:(").append(card.getSubjectPattern()).append(")");
         }
+        // Deliberately NOT narrowing the query by last4: banks print the number
+        // masked (e.g. XXXXXX1234), which Gmail tokenises as one term, so a
+        // "1234" phrase search is unreliable and could drop the real email.
+        // Disambiguation happens after decryption, where last4 reliably appears.
 
         var listResp = gmail.users().messages().list(user).setQ(q.toString()).execute();
         List<Message> messages = listResp.getMessages();
+        List<byte[]> pdfs = new ArrayList<>();
         if (messages == null || messages.isEmpty()) {
             log.info("No statement email found for card {} in {}/{}", card.getLast4(), month, year);
-            return null;
+            return pdfs;
         }
 
-        // Newest first is Gmail's default order; take the first with a PDF attachment.
+        // Gmail returns newest first; collect every matching PDF attachment.
         for (Message m : messages) {
             Message full = gmail.users().messages().get(user, m.getId()).setFormat("full").execute();
             byte[] pdf = findPdfAttachment(full.getPayload(), m.getId());
-            if (pdf != null) return pdf;
+            if (pdf != null) pdfs.add(pdf);
         }
-        return null;
+        return pdfs;
     }
 
     private byte[] findPdfAttachment(MessagePart part, String messageId) throws Exception {

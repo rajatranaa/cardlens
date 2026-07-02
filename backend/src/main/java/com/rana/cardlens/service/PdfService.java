@@ -48,6 +48,18 @@ public class PdfService {
         }
     }
 
+    /**
+     * Extracts text from ALREADY-decrypted PDF bytes (no password needed).
+     * Used only to cheaply check which card a statement belongs to (its last4
+     * is printed on the statement) before the paid Claude call. Text is never
+     * logged and bytes never touch disk.
+     */
+    public String extractText(byte[] decryptedPdfBytes) throws Exception {
+        try (PDDocument doc = Loader.loadPDF(decryptedPdfBytes)) {
+            return new PDFTextStripper().getText(doc);
+        }
+    }
+
     private String resolvePassword(Card card) {
         String key = card.getPasswordTemplateKey();
         String password = env.getProperty(key);
