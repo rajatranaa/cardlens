@@ -1,0 +1,18 @@
+{
+  "name": "cardlens-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server exposing 3 CardLens tools that proxy to the backend REST API",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "express": "^4.21.0",
+    "zod": "^3.23.8"
+  }
+}

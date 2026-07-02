@@ -1,0 +1,25 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+*token*.json
+*credential*.json
+client_secret*.json
+
+# Statement PDFs must never be committed
+*.pdf
+
+# Java / Maven
+backend/target/
+*.class
+
+# Node
+mcp-server/node_modules/
+node_modules/
+npm-debug.log*
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store

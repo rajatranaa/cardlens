@@ -1,0 +1,34 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: none          # schema managed by db/schema.sql
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+
+cardlens:
+  api-key: ${CARDLENS_API_KEY}          # static key guarding /api/**
+  claude:
+    api-key: ${ANTHROPIC_API_KEY}
+    model: ${CLAUDE_MODEL:claude-haiku-4-5-20251001}
+    base-url: ${CLAUDE_BASE_URL:https://api.anthropic.com/v1/messages}
+    version: ${CLAUDE_VERSION:2023-06-01}
+    max-tokens: ${CLAUDE_MAX_TOKENS:4096}
+  gmail:
+    client-id: ${GMAIL_CLIENT_ID}
+    client-secret: ${GMAIL_CLIENT_SECRET}
+    refresh-token: ${GMAIL_REFRESH_TOKEN}
+    user: me
+
+logging:
+  level:
+    root: INFO
+    com.rana.cardlens: INFO
