@@ -7,12 +7,14 @@ import com.rana.cardlens.model.Transaction;
 import com.rana.cardlens.repository.CardRepository;
 import com.rana.cardlens.repository.StatementRepository;
 import com.rana.cardlens.repository.TransactionRepository;
+import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -49,13 +51,48 @@ public class StatementService {
 
     public record SyncResult(String card, String status) {}
 
+    /**
+     * Outcome of a sync request. status is "OK" when the period was valid and
+     * the pipeline ran (see {@code results} per card), or "REJECTED" with a
+     * human-readable {@code reason} when the request was refused up front (e.g.
+     * a future period). Claude relays {@code reason} to the user verbatim.
+     */
+    public record SyncResponse(String status, String reason, List<SyncResult> results) {
+        static SyncResponse ok(List<SyncResult> results) {
+            return new SyncResponse("OK", null, results);
+        }
+        static SyncResponse rejected(String reason) {
+            return new SyncResponse("REJECTED", reason, List.of());
+        }
+    }
+
     @Transactional
-    public List<SyncResult> sync(int month, int year) {
+    public SyncResponse sync(int month, int year) {
+        // Guard BEFORE any Gmail/Claude work. Only the current year is in scope:
+        // a valid period is the current month or a past month OF THE CURRENT
+        // YEAR. Reject invalid months, earlier years, and future periods up
+        // front by comparing against the server's real-world date.
+        if (month < 1 || month > 12) {
+            return SyncResponse.rejected("Invalid month " + month + "; expected 1-12.");
+        }
+        YearMonth now = YearMonth.now();
+        YearMonth requested = YearMonth.of(year, month);
+        if (year < now.getYear()) {
+            return SyncResponse.rejected(
+                    "Requested period " + requested + " is before the current year; "
+                    + "only statements from the current year (" + now.getYear() + ") can be fetched.");
+        }
+        if (requested.isAfter(now)) {
+            return SyncResponse.rejected(
+                    "Requested period " + requested + " is in the future; its "
+                    + "statements have not been generated yet.");
+        }
+
         List<SyncResult> results = new ArrayList<>();
         for (Card card : cardRepo.findAll()) {
             results.add(syncCard(card, month, year));
         }
-        return results;
+        return SyncResponse.ok(results);
     }
 
     private SyncResult syncCard(Card card, int month, int year) {
@@ -67,25 +104,71 @@ public class StatementService {
         }
 
         try {
-            byte[] encrypted = gmailService.fetchStatementPdf(card, month, year);
-            if (encrypted == null) {
+            List<byte[]> candidates = gmailService.fetchStatementPdfs(card, month, year);
+            if (candidates.isEmpty()) {
                 return new SyncResult(card.getCardLabel(), "NO_EMAIL");
             }
 
-            byte[] decrypted = pdfService.decryptToBytes(encrypted, card);
-
-            ExtractionService.Result result =
-                    extractionService.extract(decrypted, card.getLast4(), month, year);
-
-            if (!result.valid()) {
-                persistNeedsReview(card, month, year, result.data());
-                log.warn("Statement for card {} flagged NEEDS_REVIEW: {}",
-                        card.getLast4(), result.reason());
-                return new SyncResult(card.getCardLabel(), "NEEDS_REVIEW: " + result.reason());
+            // Disambiguate when several cards share a sender. Two cheap filters
+            // run before the (paid) Claude call:
+            //   1. decrypt with THIS card's password — a statement for another
+            //      card is dropped here unless it shares the exact password;
+            //   2. the decrypted text must contain THIS card's last4 — reliably
+            //      printed on the statement, so it orders the right one first.
+            List<byte[]> last4Match = new ArrayList<>();
+            List<byte[]> others = new ArrayList<>();
+            for (byte[] encrypted : candidates) {
+                byte[] decrypted;
+                try {
+                    decrypted = pdfService.decryptToBytes(encrypted, card);
+                } catch (InvalidPasswordException e) {
+                    // This PDF doesn't open with THIS card's password, so it
+                    // belongs to another card sharing the sender — skip it.
+                    // A MISSING password env var (IllegalStateException) is NOT
+                    // caught here: it propagates to the outer handler and
+                    // surfaces as a clear ERROR instead of a silent NO_EMAIL.
+                    continue;
+                }
+                if (pdfService.extractText(decrypted).contains(card.getLast4())) {
+                    last4Match.add(decrypted);
+                } else {
+                    others.add(decrypted);
+                }
+            }
+            // Try last4-matching statements first, then the rest as a fallback.
+            List<byte[]> ordered = new ArrayList<>(last4Match);
+            ordered.addAll(others);
+            if (ordered.isEmpty()) {
+                return new SyncResult(card.getCardLabel(), "NO_EMAIL");
             }
 
-            persistValid(card, month, year, result.data());
-            return new SyncResult(card.getCardLabel(), "OK");
+            ExtractionService.Result review = null;
+            for (byte[] decrypted : ordered) {
+                ExtractionService.Result result =
+                        extractionService.extract(decrypted, card.getLast4(), month, year);
+                if (result.valid()) {
+                    persistValid(card, month, year, result.data());
+                    return new SyncResult(card.getCardLabel(), "OK");
+                }
+                // A last4 mismatch just means this PDF belongs to another card
+                // sharing the sender — keep looking. Any other failure is a
+                // genuine review candidate for THIS card.
+                boolean differentCard = result.data() != null
+                        && result.data().cardLast4 != null
+                        && !card.getLast4().equals(result.data().cardLast4);
+                if (!differentCard) {
+                    review = result;
+                }
+            }
+
+            if (review != null) {
+                persistNeedsReview(card, month, year, review.data());
+                log.warn("Statement for card {} flagged NEEDS_REVIEW: {}",
+                        card.getLast4(), review.reason());
+                return new SyncResult(card.getCardLabel(), "NEEDS_REVIEW: " + review.reason());
+            }
+            // Every candidate belonged to a different card.
+            return new SyncResult(card.getCardLabel(), "NO_EMAIL");
 
         } catch (Exception e) {
             log.error("Sync failed for card {}: {}", card.getLast4(), e.getMessage());

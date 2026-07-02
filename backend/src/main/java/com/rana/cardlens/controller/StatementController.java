@@ -17,8 +17,8 @@ public class StatementController {
     }
 
     @PostMapping("/sync")
-    public List<StatementService.SyncResult> sync(@RequestParam int month,
-                                                  @RequestParam int year) {
+    public StatementService.SyncResponse sync(@RequestParam int month,
+                                              @RequestParam int year) {
         return statementService.sync(month, year);
     }
 

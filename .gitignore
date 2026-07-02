@@ -6,6 +6,10 @@
 *credential*.json
 client_secret*.json
 
+# Local password builder — holds DOB/name/card details and derived passwords.
+# Contains per-bank formulas + PII; MUST never be committed (security-guardrails).
+tools/
+
 # Statement PDFs must never be committed
 *.pdf
 

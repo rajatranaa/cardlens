@@ -1,0 +1,14 @@
+# LIVE-TEST PROFILE — real Gmail fetch + real Claude extraction, but H2 in-memory
+# storage so no Postgres is required. All secrets still come from env vars
+# (application.yml placeholders); nothing is committed. The real GmailConfig
+# (@Profile("!local")) is active here, so valid Gmail OAuth env vars are required
+# at startup. Activate with -Dspring-boot.run.profiles=live.
+spring:
+  datasource:
+    url: jdbc:h2:mem:cardlens;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create        # H2 builds schema from JPA entities
