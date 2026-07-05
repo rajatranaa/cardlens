@@ -13,22 +13,28 @@ the database (only `last4` for display).
 ## Architecture
 
 ```
-Claude app  ──MCP──▶  MCP server (3 tools)  ──REST──▶  Spring Boot backend  ──▶  PostgreSQL
-                                                          ├─ Gmail API (fetch statement emails)
-                                                          └─ Claude API (PDF → structured JSON)
+Claude app  ──MCP──▶  MCP server (4 tools)  ──REST──▶  Spring Boot backend  ──▶  PostgreSQL
+                                                          └─ Gmail API (fetch statement emails)
 ```
 
-- `backend/` — Spring Boot 3 (Java 17+): Gmail fetch, PDFBox decrypt, Claude extraction, aggregation.
-- `mcp-server/` — Node.js MCP server exposing `fetch_statements`, `get_dashboard`, `list_cards`.
+The backend fetches the email, decrypts the PDF, and converts it to **Markdown**
+(via [markitdown](https://github.com/microsoft/markitdown), so transaction tables
+stay structured). The **Claude app** reads that Markdown, extracts the fields, and
+calls `save_statement` to persist. **No LLM API key is used anywhere** — extraction
+runs on the Claude app you already talk to.
+
+- `backend/` — Spring Boot 3 (Java 17+): Gmail fetch, PDFBox decrypt, PDF→Markdown (markitdown), validation, aggregation.
+- `mcp-server/` — Node.js MCP server exposing `fetch_statements`, `save_statement`, `get_dashboard`, `list_cards`.
 - `db/schema.sql` — PostgreSQL schema.
 - `.claude/skills/` — build-time guardrails (conventions, security, extraction contract).
 
 ## Prerequisites
 
-- Java 17+ and Maven
+- Java 17+ (a Maven wrapper `./mvnw` is included, so a separate Maven install is optional)
 - Node.js 18+
+- **Python 3.10+** with markitdown: `pip install -r backend/scripts/requirements.txt` (for PDF→Markdown)
 - A PostgreSQL database (local, or a free tier: Neon / Railway / Render)
-- A Google account and an Anthropic API key
+- A Google account for Gmail read-only access (no LLM API key needed)
 
 ## 1. Google Cloud + Gmail OAuth (one-time)
 
@@ -55,7 +61,7 @@ holds that card's statement password — not the password itself.
 
 Copy `.env.example` to `.env` and fill in values locally, or set them in your
 host's env settings. See that file for the full list (DB, `CARDLENS_API_KEY`,
-`ANTHROPIC_API_KEY`, Gmail OAuth, and one password env var per card).
+Gmail OAuth, and one password env var per card). No LLM API key is required.
 
 ## 4. Run the backend
 
@@ -96,14 +102,17 @@ connector in Claude. Then in chat:
 
 > Fetch my statements for June 2026.
 
-Claude calls `fetch_statements(month=6, year=2026)`, then `get_dashboard` to show
-total spend, per-card breakdown, top merchants, and upcoming due dates.
+Claude calls `fetch_statements(month=6, year=2026)` (gets the decrypted text per
+card), reads each card's text and calls `save_statement` for it, then calls
+`get_dashboard` to show total spend, per-card breakdown, top merchants, and
+upcoming due dates.
 
 ## REST API
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/statements/sync?month=&year=` | Fetch, decrypt, extract, store for the period |
+| `POST` | `/api/statements/fetch?month=&year=` | Fetch + decrypt; returns each card's statement as **Markdown** (stores nothing) |
+| `POST` | `/api/statements` | Save one card's extracted statement (validated, then stored) |
 | `GET`  | `/api/dashboard?month=&year=` | Aggregated view |
 | `GET`  | `/api/cards` | List registered cards |
 | `POST` | `/api/cards` | Register a card |
@@ -119,6 +128,7 @@ settings. Both services can also run locally on demand.
 
 ## Extraction status
 
-If Claude's extracted JSON fails validation (bad dates, `last4` mismatch, or the
-transaction total disagrees with `total_due` beyond tolerance), the statement is
-saved as `NEEDS_REVIEW` rather than persisting bad numbers.
+When the Claude app calls `save_statement`, the backend validates the fields
+(bad dates, `last4` mismatch, or the transaction total disagreeing with
+`total_due` beyond tolerance). If validation fails, the statement is saved as
+`NEEDS_REVIEW` rather than persisting bad numbers.

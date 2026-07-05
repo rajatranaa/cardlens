@@ -16,12 +16,10 @@ spring:
 
 cardlens:
   api-key: ${CARDLENS_API_KEY}          # static key guarding /api/**
-  claude:
-    api-key: ${ANTHROPIC_API_KEY}
-    model: ${CLAUDE_MODEL:claude-haiku-4-5-20251001}
-    base-url: ${CLAUDE_BASE_URL:https://api.anthropic.com/v1/messages}
-    version: ${CLAUDE_VERSION:2023-06-01}
-    max-tokens: ${CLAUDE_MAX_TOKENS:4096}
+  markdown:                             # PDF -> Markdown via markitdown (Python)
+    python: ${MARKDOWN_PYTHON:python}   # path to python with markitdown[pdf] installed
+    script: ${MARKDOWN_SCRIPT:scripts/pdf_to_markdown.py}
+    timeout-seconds: ${MARKDOWN_TIMEOUT:60}
   gmail:
     client-id: ${GMAIL_CLIENT_ID}
     client-secret: ${GMAIL_CLIENT_SECRET}

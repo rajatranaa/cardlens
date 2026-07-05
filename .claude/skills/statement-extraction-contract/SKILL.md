@@ -1,17 +1,23 @@
 ---
 name: statement-extraction-contract
-description: The strict JSON contract and validation rules for extracting credit card statement data via the Claude API. Use when writing or modifying ExtractionService, its prompts, or its tests.
+description: The strict JSON contract and validation rules for extracting credit card statement data. Use when writing or modifying the fetch/save statement flow, the MCP tool descriptions, or the backend save-time validation.
 ---
 
 # Statement Extraction Contract
 
-## Request
-- Send the decrypted PDF as a base64 `document` content block to POST /v1/messages,
-  plus one text instruction.
-- The instruction must demand: "Return ONLY valid JSON. No markdown fences, no prose."
+Extraction is done by the **Claude app**, not by an LLM API in the backend:
+- `fetch_statements(month, year)` returns each card's statement as **Markdown**
+  (the backend converts the decrypted PDF via markitdown; tables are preserved).
+- The Claude app reads each card's `markdown` and extracts the fields below.
+- It calls `save_statement` once per card; the **backend validates** before persisting.
 
-## Response JSON schema (exact keys)
+There is NO Anthropic/Claude API key anywhere in this project.
+
+## Fields to extract (exact keys — the save_statement payload)
 {
+  "card_id": 1,                  // from the fetch_statements result
+  "month": 6,                    // from the fetch_statements request
+  "year": 2026,
   "card_last4": "1234",
   "statement_date": "YYYY-MM-DD",
   "due_date": "YYYY-MM-DD",
@@ -23,10 +29,12 @@ description: The strict JSON contract and validation rules for extracting credit
 }
 - category ∈ {Food, Travel, Shopping, Fuel, Utilities, Entertainment, Health, Bills, Other}
 - Spends are positive; payments/refunds/cashback are negative.
+- Only extract cards whose fetch status is "OK"; skip NO_EMAIL / ERROR / SKIPPED.
 
-## Validation before persisting (all must pass)
-1. Strip accidental ``` fences, then parse with Jackson; parse failure → NEEDS_REVIEW.
-2. All dates parseable; statement_date falls in the requested month/year.
+## Validation before persisting (backend, inside save_statement — all must pass)
+1. All dates parseable; statement_date falls in the requested month/year.
+2. card_last4 must match the card record being saved.
 3. sum(positive transaction amounts) must equal total_due within ±1% or ₹10
-   (whichever is larger); mismatch → NEEDS_REVIEW.
-4. card_last4 must match the card record being processed.
+   (whichever is larger).
+Any failure → the statement is stored as NEEDS_REVIEW (a marker row only; never
+unvalidated transaction numbers).
