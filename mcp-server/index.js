@@ -44,17 +44,63 @@ function buildServer() {
     {
       title: "Fetch Statements",
       description:
-        "Fetch, decrypt, extract, and store all credit card statements for a given month and year. " +
-        "Runs the full sync pipeline across every registered card. Idempotent per period.",
+        "Fetch and decrypt every registered card's statement for a month/year and return it as " +
+        "Markdown per card (transaction tables included). This stores nothing and uses no LLM. " +
+        "For each returned card whose status is 'OK', read its `markdown`, extract the fields, and call " +
+        "`save_statement` once for that card: statement_date (YYYY-MM-DD), due_date (YYYY-MM-DD), " +
+        "total_due, min_due, card_last4, and transactions[] {date (YYYY-MM-DD), merchant, amount, category}. " +
+        "category must be one of: Food, Travel, Shopping, Fuel, Utilities, Entertainment, Health, Bills, Other. " +
+        "Spends are positive; payments, refunds and cashback are negative. Skip cards whose status is not 'OK'. " +
+        "After saving each card, call get_dashboard to show the summary. If the response status is 'REJECTED', " +
+        "just tell the user the `reason` (e.g. the month is in the future).",
       inputSchema: {
         month: z.number().int().min(1).max(12).describe("Statement month (1-12)"),
         year: z.number().int().min(2000).max(2100).describe("Statement year, e.g. 2026"),
       },
     },
     async ({ month, year }) => {
-      const result = await backend("POST", "/api/statements/sync", {
+      const result = await backend("POST", "/api/statements/fetch", {
         query: { month, year },
       });
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    }
+  );
+
+  server.registerTool(
+    "save_statement",
+    {
+      title: "Save Statement",
+      description:
+        "Persist ONE card's statement fields that you extracted from the text returned by " +
+        "fetch_statements. The backend validates the dates, that card_last4 matches the card, and that " +
+        "the sum of positive transactions reconciles with total_due before storing; otherwise it stores " +
+        "the statement as NEEDS_REVIEW. Call once per card, using the card_id and month/year from the " +
+        "fetch_statements result.",
+      inputSchema: {
+        card_id: z.number().int().describe("cardId from the fetch_statements result"),
+        month: z.number().int().min(1).max(12),
+        year: z.number().int().min(2000).max(2100),
+        card_last4: z.string().describe("last 4 digits as printed on the statement"),
+        statement_date: z.string().describe("YYYY-MM-DD"),
+        due_date: z.string().describe("YYYY-MM-DD"),
+        total_due: z.number(),
+        min_due: z.number(),
+        transactions: z
+          .array(
+            z.object({
+              date: z.string().describe("YYYY-MM-DD"),
+              merchant: z.string(),
+              amount: z.number().describe("positive = spend; negative = payment/refund/cashback"),
+              category: z.string().describe(
+                "Food|Travel|Shopping|Fuel|Utilities|Entertainment|Health|Bills|Other"
+              ),
+            })
+          )
+          .describe("every transaction on the statement"),
+      },
+    },
+    async (args) => {
+      const result = await backend("POST", "/api/statements", { body: args });
       return { content: [{ type: "text", text: JSON.stringify(result) }] };
     }
   );

@@ -1,5 +1,6 @@
 package com.rana.cardlens.controller;
 
+import com.rana.cardlens.model.SaveStatementRequest;
 import com.rana.cardlens.model.Statement;
 import com.rana.cardlens.service.StatementService;
 import org.springframework.web.bind.annotation.*;
@@ -16,10 +17,19 @@ public class StatementController {
         this.statementService = statementService;
     }
 
-    @PostMapping("/sync")
-    public StatementService.SyncResponse sync(@RequestParam int month,
-                                              @RequestParam int year) {
-        return statementService.sync(month, year);
+    /** Fetch + decrypt statements for the period and return the plain text per
+     *  card (no LLM, nothing stored). The Claude app extracts the fields and
+     *  then calls the save endpoint below. */
+    @PostMapping("/fetch")
+    public StatementService.FetchResponse fetch(@RequestParam int month,
+                                                @RequestParam int year) {
+        return statementService.fetch(month, year);
+    }
+
+    /** Persist one statement's extracted fields (validated server-side). */
+    @PostMapping
+    public StatementService.SaveResult save(@RequestBody SaveStatementRequest req) {
+        return statementService.saveStatement(req);
     }
 
     @GetMapping

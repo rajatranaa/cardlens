@@ -14,8 +14,6 @@ spring:
 
 cardlens:
   api-key: local-dev-key      # dummy static key; use in X-Api-Key for local calls
-  claude:
-    api-key: dummy-not-used   # extraction is not exercised in the smoke test
   gmail:
     client-id: dummy
     client-secret: dummy

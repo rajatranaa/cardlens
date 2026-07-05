@@ -12,32 +12,27 @@ import org.springframework.stereotype.Component;
 public class AppProperties {
 
     private String apiKey;          // static key guarding REST endpoints
-    private final Claude claude = new Claude();
     private final Gmail gmail = new Gmail();
+    private final Markdown markdown = new Markdown();
 
     public String getApiKey() { return apiKey; }
     public void setApiKey(String apiKey) { this.apiKey = apiKey; }
 
-    public Claude getClaude() { return claude; }
     public Gmail getGmail() { return gmail; }
+    public Markdown getMarkdown() { return markdown; }
 
-    public static class Claude {
-        private String apiKey;                      // ANTHROPIC_API_KEY
-        private String model = "claude-haiku-4-5-20251001";
-        private String baseUrl = "https://api.anthropic.com/v1/messages";
-        private String version = "2023-06-01";
-        private int maxTokens = 4096;
+    /** PDF -> Markdown conversion via the markitdown Python wrapper. */
+    public static class Markdown {
+        private String python = "python";                    // MARKDOWN_PYTHON
+        private String script = "scripts/pdf_to_markdown.py"; // MARKDOWN_SCRIPT (cwd = backend/)
+        private int timeoutSeconds = 60;
 
-        public String getApiKey() { return apiKey; }
-        public void setApiKey(String apiKey) { this.apiKey = apiKey; }
-        public String getModel() { return model; }
-        public void setModel(String model) { this.model = model; }
-        public String getBaseUrl() { return baseUrl; }
-        public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
-        public String getVersion() { return version; }
-        public void setVersion(String version) { this.version = version; }
-        public int getMaxTokens() { return maxTokens; }
-        public void setMaxTokens(int maxTokens) { this.maxTokens = maxTokens; }
+        public String getPython() { return python; }
+        public void setPython(String python) { this.python = python; }
+        public String getScript() { return script; }
+        public void setScript(String script) { this.script = script; }
+        public int getTimeoutSeconds() { return timeoutSeconds; }
+        public void setTimeoutSeconds(int timeoutSeconds) { this.timeoutSeconds = timeoutSeconds; }
     }
 
     public static class Gmail {
