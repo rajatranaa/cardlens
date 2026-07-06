@@ -48,6 +48,7 @@ function buildServer() {
         "Markdown per card (transaction tables included). This stores nothing and uses no LLM. " +
         "For each returned card whose status is 'OK', read its `markdown`, extract the fields, and call " +
         "`save_statement` once for that card: statement_date (YYYY-MM-DD), due_date (YYYY-MM-DD), " +
+        "total_spends (this cycle's total spend, usually printed on the statement, e.g. 'Total spends'), " +
         "total_due, min_due, card_last4, and transactions[] {date (YYYY-MM-DD), merchant, amount, category}. " +
         "category must be one of: Food, Travel, Shopping, Fuel, Utilities, Entertainment, Health, Bills, Other. " +
         "Spends are positive; payments, refunds and cashback are negative. Skip cards whose status is not 'OK'. " +
@@ -85,6 +86,10 @@ function buildServer() {
         due_date: z.string().describe("YYYY-MM-DD"),
         total_due: z.number(),
         min_due: z.number(),
+        total_spends: z
+          .number()
+          .optional()
+          .describe("this cycle's total spends (sum of the debit transactions), as printed on the statement; used to validate the extraction"),
         transactions: z
           .array(
             z.object({
