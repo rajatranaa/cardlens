@@ -39,6 +39,9 @@ public class SaveStatementRequest {
     @JsonProperty("min_due")
     public BigDecimal minDue;
 
+    @JsonProperty("total_spends")
+    public BigDecimal totalSpends;   // this cycle's spend total, for reconciliation
+
     @JsonProperty("transactions")
     public List<ExtractedStatement.ExtractedTxn> transactions;
 }

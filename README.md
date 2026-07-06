@@ -129,6 +129,8 @@ settings. Both services can also run locally on demand.
 ## Extraction status
 
 When the Claude app calls `save_statement`, the backend validates the fields
-(bad dates, `last4` mismatch, or the transaction total disagreeing with
-`total_due` beyond tolerance). If validation fails, the statement is saved as
-`NEEDS_REVIEW` rather than persisting bad numbers.
+(bad dates, `last4` mismatch, or the transaction sum disagreeing with the
+statement's `total_spends` beyond tolerance — reconciled against `total_spends`,
+not `total_due`, since `total_due` nets any carried balance and payments). If
+validation fails, the statement is saved as `NEEDS_REVIEW` rather than
+persisting bad numbers.

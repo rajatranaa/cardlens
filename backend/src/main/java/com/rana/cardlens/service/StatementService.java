@@ -173,6 +173,7 @@ public class StatementService {
         d.dueDate = req.dueDate;
         d.totalDue = req.totalDue;
         d.minDue = req.minDue;
+        d.totalSpends = req.totalSpends;
         d.transactions = req.transactions;
         return d;
     }
@@ -197,21 +198,26 @@ public class StatementService {
         if (d.cardLast4 == null || !d.cardLast4.equals(expectedLast4)) {
             return "card_last4 mismatch";
         }
-        if (d.totalDue == null) return "missing total_due";
 
-        BigDecimal sumPositive = BigDecimal.ZERO;
-        if (d.transactions != null) {
-            for (var t : d.transactions) {
-                if (t.amount != null && t.amount.signum() > 0) {
-                    sumPositive = sumPositive.add(t.amount);
+        // Reconcile the listed transactions against the cycle's TOTAL SPENDS
+        // (not total_due, which nets the carried balance + payments and so would
+        // not equal a single month's spend). Skipped when the statement doesn't
+        // expose a spends figure.
+        if (d.totalSpends != null) {
+            BigDecimal sumPositive = BigDecimal.ZERO;
+            if (d.transactions != null) {
+                for (var t : d.transactions) {
+                    if (t.amount != null && t.amount.signum() > 0) {
+                        sumPositive = sumPositive.add(t.amount);
+                    }
                 }
             }
-        }
-        BigDecimal tolerance = d.totalDue.abs()
-                .multiply(new BigDecimal("0.01"))
-                .max(new BigDecimal("10"));
-        if (sumPositive.subtract(d.totalDue).abs().compareTo(tolerance) > 0) {
-            return "totals mismatch (sum=" + sumPositive + ", total_due=" + d.totalDue + ")";
+            BigDecimal tolerance = d.totalSpends.abs()
+                    .multiply(new BigDecimal("0.01"))
+                    .max(new BigDecimal("10"));
+            if (sumPositive.subtract(d.totalSpends).abs().compareTo(tolerance) > 0) {
+                return "spends mismatch (sum=" + sumPositive + ", total_spends=" + d.totalSpends + ")";
+            }
         }
         return null;
     }
