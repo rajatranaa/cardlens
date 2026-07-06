@@ -30,9 +30,13 @@ There is NO Anthropic/Claude API key anywhere in this project.
 }
 - category ∈ {Food, Travel, Shopping, Fuel, Utilities, Entertainment, Health, Bills, Other}
 - Spends are positive; payments/refunds/cashback are negative.
-- total_due is the AMOUNT OWED (may include carried balance); total_spends is just
-  this cycle's spend (statements print it as "Total spends"/"Total spends this cycle").
-  Omit total_spends only if the statement truly doesn't show one.
+- total_due = the amount payable for THIS billing cycle. Use the field labelled
+  "Total Amount Due" / "Total Payment Due" / "Total Dues" / "Total Amount Payable".
+  When a statement shows several totals, do NOT use "Net Outstanding Balance" /
+  "Total Outstanding" / "Closing Balance" — those can include EMI/loan principal not
+  due this cycle. total_due pairs with the Minimum Amount Due and Payment Due Date.
+- total_spends = this cycle's spend only ("Total spends" / "Total Purchases").
+  Omit it only if the statement truly doesn't show one.
 - Only extract cards whose fetch status is "OK"; skip NO_EMAIL / ERROR / SKIPPED.
 
 ## Validation before persisting (backend, inside save_statement — all must pass)
