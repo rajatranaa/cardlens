@@ -68,17 +68,19 @@ public class GmailService {
             return pdfs;
         }
 
-        // Gmail returns newest first; collect every matching PDF attachment.
+        // Collect EVERY PDF attachment across the matching emails. A statement
+        // email often also carries a terms/MITC PDF (and that one may even be
+        // unencrypted), so we must not stop at the first PDF — the caller
+        // decrypts each and keeps the one that matches this card's last4.
         for (Message m : messages) {
             Message full = gmail.users().messages().get(user, m.getId()).setFormat("full").execute();
-            byte[] pdf = findPdfAttachment(full.getPayload(), m.getId());
-            if (pdf != null) pdfs.add(pdf);
+            collectPdfAttachments(full.getPayload(), m.getId(), pdfs);
         }
         return pdfs;
     }
 
-    private byte[] findPdfAttachment(MessagePart part, String messageId) throws Exception {
-        if (part == null) return null;
+    private void collectPdfAttachments(MessagePart part, String messageId, List<byte[]> out) throws Exception {
+        if (part == null) return;
 
         boolean isPdf = "application/pdf".equalsIgnoreCase(part.getMimeType())
                 || (part.getFilename() != null && part.getFilename().toLowerCase().endsWith(".pdf"));
@@ -88,20 +90,16 @@ public class GmailService {
             if (body != null && body.getAttachmentId() != null) {
                 MessagePartBody att = gmail.users().messages().attachments()
                         .get(user, messageId, body.getAttachmentId()).execute();
-                return Base64.getUrlDecoder().decode(att.getData());
-            }
-            if (body != null && body.getData() != null) {
-                return Base64.getUrlDecoder().decode(body.getData());
+                out.add(Base64.getUrlDecoder().decode(att.getData()));
+            } else if (body != null && body.getData() != null) {
+                out.add(Base64.getUrlDecoder().decode(body.getData()));
             }
         }
 
         if (part.getParts() != null) {
-            List<MessagePart> parts = new ArrayList<>(part.getParts());
-            for (MessagePart child : parts) {
-                byte[] found = findPdfAttachment(child, messageId);
-                if (found != null) return found;
+            for (MessagePart child : part.getParts()) {
+                collectPdfAttachments(child, messageId, out);
             }
         }
-        return null;
     }
 }
