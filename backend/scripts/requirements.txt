@@ -1,3 +1,11 @@
 # Python deps for the PDF -> Markdown step (pdf_to_markdown.py).
 # Install with:  pip install -r backend/scripts/requirements.txt
 markitdown[pdf]
+
+# OCR fallback for statements whose text layer is garbled (missing-font glyphs).
+# Also requires the Tesseract OCR engine installed on the host:
+#   Windows: winget install UB-Mannheim.TesseractOCR
+#   Debian/Ubuntu: apt-get install tesseract-ocr
+pymupdf
+pytesseract
+pillow
