@@ -48,8 +48,13 @@ function buildServer() {
         "Markdown per card (transaction tables included). This stores nothing and uses no LLM. " +
         "For each returned card whose status is 'OK', read its `markdown`, extract the fields, and call " +
         "`save_statement` once for that card: statement_date (YYYY-MM-DD), due_date (YYYY-MM-DD), " +
-        "total_spends (this cycle's total spend, usually printed on the statement, e.g. 'Total spends'), " +
-        "total_due, min_due, card_last4, and transactions[] {date (YYYY-MM-DD), merchant, amount, category}. " +
+        "total_spends (this cycle's total spend/purchases, e.g. 'Total spends' / 'Total Purchases'), " +
+        "total_due (the amount payable for THIS billing cycle — the field labelled 'Total Amount Due' / " +
+        "'Total Payment Due' / 'Total Dues' / 'Total Amount Payable'; when several totals appear do NOT use " +
+        "'Net Outstanding Balance' / 'Total Outstanding' / 'Closing Balance', which include EMI/loan principal " +
+        "not due this cycle — total_due pairs with the Minimum Amount Due and Payment Due Date), " +
+        "min_due (the 'Minimum Amount Due' / 'Minimum Payment Due'), card_last4, and " +
+        "transactions[] {date (YYYY-MM-DD), merchant, amount, category}. " +
         "category must be one of: Food, Travel, Shopping, Fuel, Utilities, Entertainment, Health, Bills, Other. " +
         "Spends are positive; payments, refunds and cashback are negative. Skip cards whose status is not 'OK'. " +
         "After saving each card, call get_dashboard to show the summary. If the response status is 'REJECTED', " +
